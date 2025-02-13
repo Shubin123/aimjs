@@ -30,6 +30,6 @@ I do this through a (raspberry pi pico rp2040) micro-controller connected to the
 
 ### this project was originally inspired by https://github.com/RootKit-Org/AI-Aimbot. Moreover, my early attempts was based on extending https://github.com/Hyuto/yolov8-onnxruntime-web to use the webgpu runtime and extending the functionality (webcam or pre-recording). Later on I switched the onnxruntime in favor of [Google's MediaPipe Object Detector](https://ai.google.dev/edge/mediapipe/solutions/vision/object_detector) offering efficentDet-Lite and mobileNet models through tensorflow.js instead of Yolo ran through onnxruntime-web.
 
-The original version of this project based on modifying [Hyuto/yolov8-onnxruntime-web](https://github.com/Hyuto/yolov8-onnxruntime-web) is available in [./extras/independent/oldindex.html](./extras/independent/oldindex.html) as a standalone **you'll need to get yolo and the nms model yourself** [see extras readme](./extras/README.MD)
+The original version of this project based on modifying [Hyuto/yolov8-onnxruntime-web](https://github.com/Hyuto/yolov8-onnxruntime-web) is available in [./extras/independent/oldindex.html](./extras/independent/oldindex.html) as a standalone **you'll need to get yolo and the nms model yourself** [see extras readme](./extras/readme.md)
 
 The past progress videos using the onnxruntime-web in [./extras/media](./extras/media)
