@@ -13,7 +13,7 @@
 
 # To enable mouse takeover:
 
-I do this through a (raspberry pi pico rp2040) micro-controller connected to the host computer where I want the mouse to be controlled. The source (mouse) and compiled (uf2) can be found in the [./extras/arduino](./extras/arduino) directory. By default it will open its own webserver via ad-hoc ap mode. You can choose to connect to an existing wlan aswell. The device connecting or just requesting the micro-controller http server can be a smartphone running the model, this way the host pc getting its cursor controlled is oblivious to the fact. Once the model is loaded everything works without internet connection (cached offline not fully there yet).
+I do this through a (raspberry pi pico rp2040) micro-controller connected to the host computer where I want the mouse to be controlled. The source (mouse) and compiled (uf2) can be found in the [./extras/arduino](./extras/arduino) directory. By default it will open its own webserver via ad-hoc ap mode. You can choose to connect to an existing wlan aswell. The device connected to and/or requesting the micro-controller http server can be a smartphone running the model, this way the host pc getting its cursor controlled is oblivious to the fact. Once the model is loaded everything works without internet connection (cached offline not fully there yet).
 
 # Try it at https://shubinwang.com/detect (THIS VERSION WONT MOUSE JACK 😅)
 
