@@ -1,4 +1,4 @@
-# 🎯 Aim your mouse through object detection 🎯 all you need is a browser!
+# 🎯 Aim your cursor through object detection 🎯 all you need is a browser!
 
 ![preview](./extras/media/preview.gif)![preview](./extras/media/preview2.gif)
 
