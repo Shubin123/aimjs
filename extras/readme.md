@@ -1,17 +1,3 @@
-# PLEASE modify the microcontroller code before use 
-## Although the uf2 CAN be uploaded directly and WILL work, for your own safety consider the following:
-
-- 1. setup the arduino ide with the right board manager for your micro-controller.
-- 2. load the [sketch](./arduino/controlMouse.ino) into the ide, verify external libraries valid.
-- 3. change the network STASSID / STAPSK ie: name / password  (techincally optional, highly recommended).
-- 3.2 (optional) uncomment WiFi.mode(WIFI_STA) AND comment out WiFi.mode(WIFI_AP); for exsting wlan connection.
-- 3.3 (very optional) comment out the debugging serial.println and serial.begin lines if kernel anticheat scans serial ports (unlikely)
-- 4. flash the pico through arduino ide upload button or exported binary (uf2).
-- 5. point to the right ip (192.168.0.1 in sta mode)
-
-## Note that the mouse-controller portion of this program is currently served over http (unsecure) DO NOT PORTFORWARD!
-for this project, there should be no reason to portforward the pi pico EVER (this is when connected to existing wlan, in AP mode you wont be able portforward anyways)
-
 ### Extra/stale code
  - the getpico.html app makes request to the microcontroller without needing to load up the object detector
  - the flashpico.html does not work and was an attempt to keep everything in one browser page including uploading code to the micro-controller

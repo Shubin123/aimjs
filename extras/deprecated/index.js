@@ -1,62 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>YOLOv8 Object Detection</title>
-    <!-- Bootstrap CSS -->
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-    />
-    <!-- OpenCV.js -->
-    <script
-      async
-      src="https://docs.opencv.org/4.5.2/opencv.js"
-      type="text/javascript"
-    ></script>
-    <!-- ONNX Runtime Web -->
-    <script
-      src="https://cdnjs.cloudflare.com/ajax/libs/onnxruntime-web/1.20.1/ort.webgpu.min.js"
-      integrity="sha512-VfhX+QkN7NbCrYehivVRUqfUdswaFcRPtmyBSMGIXGbIMRku82aqFB2mKxvrtNV9TYP6JWz371CfTIzAExMyCA=="
-      crossorigin="anonymous"
-      referrerpolicy="no-referrer"
-    ></script>
-  </head>
-  <body>
-    <div class="container">
-      <h1>Video Object Detection</h1>
-      <p>
-        YOLOv8 object detection application 
-        using <code>onnxruntime-web</code>.
-      </p>
-      
-
-      <div class="video-container">
-        <video id="video" muted autoplay style="display: none"></video>
-        <canvas id="canvas" width="640" height="640"></canvas>
-      </div>
-
-      <div class="mt-3">
-        <input type="file" id="videoInput" accept="video/*" class="d-none" />
-        <button class="btn btn-primary me-2" id="uploadBtn">
-          Upload Video
-        </button>
-        <button class="btn btn-success me-2" id="frontCamBtn">Front Camera</button>
-        <button class="btn btn-success me-2" id="backCamBtn">Back Camera</button>
-        <button class="btn btn-danger" id="stopBtn">Stop Video</button>
-      </div>
-    </div>
-
-    <script type="module">
-
 
 
 // Global variables
 let session = null;
 let videoSource = null;
 let isPlaying = false;
-const modelName = "yolov8n.onnx";
 const modelInputShape = [1, 3, 640, 640];
 const topk = 100;
 const iouThreshold = 0.45;
@@ -79,7 +26,7 @@ async function initialize() {
   console.log("OpenCV initialized.");
 
   
-  const arrBufNet = await download(`./yolov-8.onnx`); // put these two model files in the same directory as this html file
+  const arrBufNet = await download(`./yolov8n.onnx`); // put these two model files in the same directory as this html file
   const arrBufNMS = await download(`./nms-yolov8.onnx`);
 
   const yolov8 = await createSession(arrBufNet);
@@ -615,8 +562,3 @@ class Colors {
       : null;
   };
 }
-
-
-    </script>
-  </body>
-</html>
