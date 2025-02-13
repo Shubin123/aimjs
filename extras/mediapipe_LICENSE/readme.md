@@ -1,0 +1,3 @@
+This directory contains the original license for the mediapipe object detector example code from https://ai.google.dev/edge/mediapipe/solutions/vision/object_detector and https://codepen.io/mediapipe-preview/pen/vYrWvNg.
+
+From what I understand the mediapipe software in this project is considered under preview https://ai.google.dev/edge/mediapipe/solutions/about#notice. If Google or the mediapipe team has reason to believe code in this repository is incorrectly licensed or infringes on rights of respective property holders, then it is my intention to no longer make this code public.

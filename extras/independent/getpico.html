@@ -1,0 +1,57 @@
+<!-- tests the pico connection without need for object detection portion -->
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HTTP GET Request</title>
+  </head>
+  <body>
+    <h1>Make a GET Request!</h1>
+    <button id="fetchButton">Fetch Data</button>
+    <input type="text" id="inputIp" placeholder="input ip" />
+    <p id="response"></p>
+
+  
+    <script type="module">
+      console.log(document.getElementById("inputIp").value);
+      // let ip = "192.168.42.1"; // if Wifi.mode(WIFI_STA) 
+      let ip = "192.168.1.152";
+      document
+        .getElementById("fetchButton")
+        .addEventListener("click", async () => {
+          movemouse();
+        });
+
+      function updateMousePosition(x, y) {
+        // const url = `http://${ip}`;
+        const url = `http://${ip}/update-mouse?x=${x}&y=${y}`;
+
+        fetch(url)
+          .then((response) => response.text())
+          .then((data) => console.log(data))
+          .catch((error) => console.error("Error:", error));
+      }
+      let i = 0;
+      function movemouse() {
+        // updateMousePosition(-1, -500); //maxes out at 1000 per call
+        // updateMousePosition(1000, -1000);
+        // let i = 0;
+        // while (i < 7) {
+
+        let timeToNextMove = 70; // in ms roughly 30-70 of processing (object detection lag prior to this point hence the timeout in simulation)
+        let numberOfMoves = 10000000;
+        let updateBase = 300;
+          setTimeout(function () {
+
+            updateMousePosition(updateBase , 0);
+            if (i < numberOfMoves){
+            movemouse();
+            }
+            i += 1;
+          }, timeToNextMove);
+      }
+    </script>
+  </body>
+</html>

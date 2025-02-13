@@ -1,0 +1,139 @@
+<head>
+
+</head>
+
+<body>
+<style>
+body {
+  font-family: roboto;
+  margin: 2em;
+  color: #3d3d3d;
+  --mdc-theme-primary: #007f8b;
+  --mdc-theme-on-primary: #f1f3f4;
+}
+
+h1 {
+  color: #007f8b;
+}
+
+h2 {
+  clear: both;
+}
+
+em {
+  font-weight: bold;
+}
+
+video {
+  clear: both;
+  display: block;
+  transform: rotateY(180deg);
+  -webkit-transform: rotateY(180deg);
+  -moz-transform: rotateY(180deg);
+}
+
+section {
+  opacity: 1;
+  transition: opacity 500ms ease-in-out;
+}
+
+.mdc-button.mdc-button--raised.removed {
+  display: none;
+}
+
+.invisible {
+  opacity: 0.2;
+}
+
+.videoView,
+.detectOnClick {
+  position: relative;
+  float: left;
+  width: 48%;
+  margin: 2% 1%;
+  cursor: pointer;
+}
+
+.detectOnClick p {
+  position: absolute;
+  padding: 5px;
+  background-color: #007f8b;
+  color: #fff;
+  border: 1px dashed rgba(255, 255, 255, 0.7);
+  z-index: 2;
+  font-size: 12px;
+  margin: 0;
+}
+
+.videoView p {
+  position: absolute;
+  padding-bottom: 5px;
+  padding-top: 5px;
+  background-color: #007f8b;
+  color: #fff;
+  border: 1px dashed rgba(255, 255, 255, 0.7);
+  z-index: 2;
+  font-size: 12px;
+  margin: 0;
+}
+
+.highlighter {
+  background: rgba(0, 255, 0, 0.25);
+  border: 1px dashed #fff;
+  z-index: 1;
+  position: absolute;
+}
+
+.detectOnClick {
+  z-index: 0;
+}
+
+.detectOnClick img {
+  width: 100%;
+}
+
+</style>
+<link href="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.css" rel="stylesheet">
+<script src="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.js"></script>
+
+
+  <div id="liveView" class="videoView">
+    <video id="webcam" autoplay playsinline></video>
+  </div>
+</section>  
+
+<input type="file" id="videoInput" accept="video/*" />
+
+<input type="button" id="stopBtn" value="stop">
+<input type="button" id="pauseBtn" value="pause">
+
+
+
+<!-- CONTROLS -->
+
+<button id="webcamButton" class="mdc-button mdc-button--raised">
+  <span class="mdc-button__ripple"></span>
+  <span class="mdc-button__label">ENABLE WEBCAM</span>
+</button>
+
+
+<div>
+  <label for="maxObjects">Enable Mouse Control:</label>
+  <input type="checkbox" id="mouseControlCheckBox"/>
+</div>
+
+<div>
+  <label for="maxObjects">Max Objects per Frame:</label>
+  <input type="range" id="maxObjects" min="1" max="200" value="10" />
+  <span id="maxObjectsValue">10</span>
+</div>
+
+<div>
+  <label for="confidenceThreshold">Confidence Threshold (%):</label>
+  <input type="range" id="confidenceThreshold" min="0" max="100" value="30" />
+  <span id="confidenceThresholdValue">30</span>
+</div>
+
+<!-- js -->
+<script type="module" src="index.js"></script>
+</body>

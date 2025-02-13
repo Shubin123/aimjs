@@ -1,0 +1,190 @@
+<!-- FILE NOT WORKING attempt to flash the pico over a browser FILE NOT WORKING -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pico Web Flasher</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+        }
+        button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:disabled {
+            background: #cccccc;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .error { background: #ffebee; color: #c62828; }
+        .success { background: #e8f5e9; color: #2e7d32; }
+    </style>
+</head>
+<body>
+    <h1>Pi Pico Web Flasher</h1>
+    <div class="container">
+        <input type="file" id="fileInput" accept=".uf2" style="display: none">
+        <button id="connectButton">Connect to Pico</button>
+        <button id="selectFile">Select UF2 File</button>
+        <button id="flashButton" disabled>Flash Pico</button>
+        <div id="file-info"></div>
+        <div id="status"></div>
+    </div>
+
+    <script>
+        let picoDev = null;
+        let fileBuffer = null;
+
+        // Pico in BOOTSEL mode
+        const PICO_INFO = {
+            vendorId: 0x2E8A,
+            productId: 0x0003,
+            classCode: 0x08, // Mass Storage Class
+        };
+
+        // UF2 block size and magic numbers
+        const UF2_BLOCK_SIZE = 512;
+        const UF2_MAGIC_START1 = 0x0A324655; // "UF2\n"
+        const UF2_MAGIC_START2 = 0x9E5D5157;
+        const UF2_MAGIC_END = 0x0AB16F30;
+
+        async function connectPico() {
+            try {
+                // const device = await navigator.usb.requestDevice({
+                //     filters: [{
+                //         vendorId: PICO_INFO.vendorId,
+                //         productId: PICO_INFO.productId,
+                //         classCode: PICO_INFO.classCode
+                //     }]
+                // });
+
+                // await device.open();
+                // await device.selectConfiguration(1);
+                // await device.claimInterface(0);
+
+                // picoDev = device;
+                // showStatus('Pico connected in BOOTSEL mode');
+                // updateButtons();
+                navigator.usb.getDevices().then(devices => {
+  devices.forEach(device => {
+    console.log(device);      // "Arduino Micro"
+    console.log(device.productName);      // "Arduino Micro"
+    console.log(device.manufacturerName); // "Arduino LLC"
+  });
+})
+            } catch (error) {
+                showStatus('Connection error: ' + error.message, true);
+            }
+        }
+
+        async function flashDevice() {
+            if (!picoDev || !fileBuffer) return;
+
+            try {
+                showStatus('Starting flash process...');
+                const blocks = createUF2Blocks(fileBuffer);
+                
+                for (let i = 0; i < blocks.length; i++) {
+                    await picoDev.transferOut(1, blocks[i]);
+                    showStatus(`Flashing: ${Math.round((i + 1) / blocks.length * 100)}%`);
+                }
+
+                showStatus('Flash complete! You can now reset your Pico');
+            } catch (error) {
+                showStatus('Flash error: ' + error.message, true);
+            }
+        }
+
+        function createUF2Blocks(binary) {
+            const blocks = [];
+            const blockSize = 256; // RP2040 flash page size
+            const numBlocks = Math.ceil(binary.byteLength / blockSize);
+
+            for (let blockIdx = 0; blockIdx < numBlocks; blockIdx++) {
+                const block = new ArrayBuffer(UF2_BLOCK_SIZE);
+                const view = new DataView(block);
+
+                // UF2 header
+                view.setUint32(0, UF2_MAGIC_START1, true);
+                view.setUint32(4, UF2_MAGIC_START2, true);
+                view.setUint32(8, 0x00002000, true); // UF2 block flags
+                view.setUint32(12, 0x10000000 + blockIdx * blockSize, true); // Target addr
+                view.setUint32(16, blockSize, true);
+                view.setUint32(20, blockIdx, true);
+                view.setUint32(24, numBlocks, true);
+                view.setUint32(28, 0, true); // File size/family ID
+                
+                // Copy binary data
+                const start = blockIdx * blockSize;
+                const end = Math.min(start + blockSize, binary.byteLength);
+                const blockData = new Uint8Array(binary.slice(start, end));
+                new Uint8Array(block, 32, blockSize).set(blockData);
+
+                // UF2 footer
+                view.setUint32(508, UF2_MAGIC_END, true);
+
+                blocks.push(block);
+            }
+
+            return blocks;
+        }
+
+        function showStatus(message, isError = false) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = isError ? 'error' : 'success';
+        }
+
+        function updateButtons() {
+            const flashButton = document.getElementById('flashButton');
+            flashButton.disabled = !(picoDev && fileBuffer);
+        }
+
+        // Event Listeners
+        document.getElementById('connectButton').addEventListener('click', connectPico);
+
+        document.getElementById('selectFile').addEventListener('click', () => {
+            document.getElementById('fileInput').click();
+        });
+
+        document.getElementById('fileInput').addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            if (!file.name.endsWith('.uf2')) {
+                showStatus('Please select a .uf2 file', true);
+                return;
+            }
+
+            try {
+                fileBuffer = await file.arrayBuffer();
+                document.getElementById('file-info').textContent = 
+                    `Selected: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`;
+                showStatus('File loaded successfully');
+                updateButtons();
+            } catch (error) {
+                showStatus('Error loading file: ' + error.message, true);
+            }
+        });
+
+        document.getElementById('flashButton').addEventListener('click', flashDevice);
+    </script>
+</body>
+</html>
