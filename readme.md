@@ -13,7 +13,7 @@
 
 # To enable mouse takeover:
 
-## currently achieve through (raspberry pi pico rp2040) micro-controller connected to the host computer, acting as a USB [HID](https://en.wikipedia.org/wiki/Human_interface_device). The source (.ino) and compiled (.uf2) can be found in the [./microController](./microController) directory. By default it will open its own webserver via ad-hoc ap mode. You can choose to connect to an existing wlan aswell. The device connected to and/or requesting the micro-controller http server can be a smartphone running the model, this way the host pc getting its cursor controlled is oblivious to the fact. Once the model is loaded everything works without internet connection (cached offline not fully there yet).
+### currently achieve through (raspberry pi pico rp2040) micro-controller connected to the host computer, acting as a USB [HID](https://en.wikipedia.org/wiki/Human_interface_device). The source (.ino) and compiled (.uf2) can be found in the [./microController](./microController) directory. By default it will open its own webserver via ad-hoc ap mode. You can choose to connect to an existing wlan aswell. The device connected to and/or requesting the micro-controller http server can be a smartphone running the model, this way the host pc getting its cursor controlled is oblivious to the fact. Once the model is loaded everything works without internet connection (cached offline not fully there yet).
 
 # Try it at https://shubinwang.com/detect (THIS VERSION WONT MOUSE JACK 😅)
 

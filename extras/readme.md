@@ -14,7 +14,7 @@ https://drive.google.com/drive/folders/1EP1JI2eD_AjzpK2Fxo-nZ0RQ2v3tCPKg
  - restarting the app with buttons wont work (currently page refresh works but inefficently (especially if your using pico in ap mode (forcing two more wlan switches))).
 
 ##### Plans for future functionality:
- - make mouse mapping dynamic (right now its set statically it should be based off screen/video size)
+ - make 2d mouse mapping dynamic (right now its set statically it should be based off screen/video size)
  - add an ip field for the client side to pick (easy-ish just needs some testing to confirm working)
  - add esp32 (vroom/c3) support (not too difficult assuming external library parity in functionality)
  - add pi zero 2 w support (difficult to debug right now g_serial and g_hid cant be multiplexed over usb)
