@@ -2,8 +2,8 @@
 #include <WiFiClient.h>
 #include <WebServer.h>
 #include <LEAmDNS.h>
-#include <MouseAbsolute.h> // If you plan on only using one type of mouse movement
-#include <Mouse.h>         // then comment out one of these headers.
+// #include <MouseAbsolute.h>    // If you plan on only using absolute positioning DISABLE MOUSE.h
+#include <Mouse.h>         // then comment in/out ONLY ONE of these headers AND their respective function below.
 
 #ifndef STASSID
 #define STASSID "pi-net-aim" // change this regardless of wlan modes
@@ -93,25 +93,24 @@ void setup(void) {
   });
 
 
+
+  // server.on("/update-mouse", []() {
+  // if (server.hasArg("x") && server.hasArg("y")) {
+  //   int x = server.arg("x").toInt();
+  //   int y = server.arg("y").toInt();
+  //   // Move the mouse to the new position absolutely
+  //   MouseAbsolute.move(x, y, 0);
+  //   server.send(200, "text/plain", "Mouse position updated");
+  // } else {
+  //   server.send(400, "text/plain", "Missing x or y parameter");
+  // }
+  // });
+
   server.on("/update-mouse", []() {
   if (server.hasArg("x") && server.hasArg("y")) {
     int x = server.arg("x").toInt();
     int y = server.arg("y").toInt();
-    
-    // Move the mouse to the new position
-    MouseAbsolute.move(x, y, 0);
-    server.send(200, "text/plain", "Mouse position updated");
-  } else {
-    server.send(400, "text/plain", "Missing x or y parameter");
-  }
-  });
-
-   server.on("/update-mouse-relative", []() {
-  if (server.hasArg("x") && server.hasArg("y")) {
-    int x = server.arg("x").toInt();
-    int y = server.arg("y").toInt();
-    
-    // Move the mouse to the new position
+    // Move the mouse to the relative to previous position
       Mouse.move(x, y);
     server.send(200, "text/plain", "Mouse position updated");
   } else {
@@ -160,12 +159,6 @@ void setup(void) {
           last = millis();
         }
       }
-      // Two choices: return MUST STOP and webserver will close it
-      //                       (we already have the example with '/fail' hook)
-      // or                  IS GIVEN and webserver will forget it
-      // trying with IS GIVEN and storing it on a dumb WiFiClient.
-      // check the client connection: it should not immediately be closed
-      // (make another '/dump' one to close the first)
       Serial.printf("\nTelling server to forget this connection\n");
       static WiFiClient forgetme = *client;  // stop previous one if present and transfer client refcounter
       return WebServer::CLIENT_IS_GIVEN;

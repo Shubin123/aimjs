@@ -8,6 +8,10 @@ const demosSection = document.getElementById("demos");
 let objectDetector;
 let runningMode = "IMAGE";
 
+// set this to the microcontroller's ip
+// const ip = "192.168.42.1"; //default
+const ip = "192.168.1.152"; //random cidr class c addr assigned by dhcp
+
 // Initialize the object detector
 const initializeObjectDetector = async () => {
   const vision = await FilesetResolver.forVisionTasks(
@@ -15,8 +19,8 @@ const initializeObjectDetector = async () => {
   );
   objectDetector = await ObjectDetector.createFromOptions(vision, {
     baseOptions: {
-      modelAssetPath: `https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite`,
-      //   modelAssetPath: `https://storage.googleapis.com/mediapipe-models/object_detector/ssd_mobilenet_v2/float16/1/ssd_mobilenet_v2.tflite`,
+      // modelAssetPath: `https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite`,
+        modelAssetPath: `https://storage.googleapis.com/mediapipe-models/object_detector/ssd_mobilenet_v2/float16/1/ssd_mobilenet_v2.tflite`,
       delegate: "GPU",
     },
     scoreThreshold: confidenceThreshold,
@@ -52,9 +56,7 @@ let pauseBtn = document.getElementById("pauseBtn");
 let maxObjects = parseInt(maxObjectsSlider.value);
 let confidenceThreshold = parseFloat(confidenceThresholdSlider.value) / 100;
 
-// set this to the microcontroller's ip
-let ip = "192.168.42.1"; //default
-// let ip = "192.168.1.152"; //random cidr class c addr assigned by dhcp
+
 
 // Update slider values in real-time
 maxObjectsSlider.addEventListener("input", () => {
@@ -193,9 +195,9 @@ async function predictWebcam() {
 
 const calibrationArea = {
   x1: 0, // Top-left X
-  y1: 0, // Top-left Y
-  x2: 20000, // Bottom-right X
-  y2: 20000, // Bottom-right Y
+  y1: 200, // Top-left Y
+  x2: 940*20, // Bottom-right X
+  y2: 500*40, // Bottom-right Y
 };
 
 // Function to map camera coordinates to mouse coordinates
@@ -211,7 +213,7 @@ function mapCoordinates(cameraX, cameraY) {
   return { mouseX, mouseY };
 }
 
-function displayVideoDetections(result) {
+async function displayVideoDetections(result) {
   // Remove any highlighting from previous frame.
   for (let child of children) {
     liveView.removeChild(child);
@@ -227,9 +229,9 @@ function displayVideoDetections(result) {
     const centerX = video.offsetWidth - width - originX + width / 2;
     const centerY = originY + height / 2;
     const { mouseX, mouseY } = mapCoordinates(centerX, centerY);
-
+    await updateMousePosition(mouseX, mouseY);
     // Send the mapped coordinates to the server
-    updateMousePosition(mouseX, mouseY);
+    
 
     // Check if the detected object is a "person" and height > width
     // if (label === "person" && height > width) {
@@ -297,16 +299,15 @@ function displayVideoDetections(result) {
   }
 }
 
-function updateMousePosition(x, y) {
-    if (!mouseControlBox.checked){return};
+async function updateMousePosition(x, y) {
+    // if (!mouseControlBox.checked){return};
   // const url = `http://${ip}`;
-  const url = `http://${ip}/update-mouse?x=${x}&y=${y}`;
+  const url = `https://${ip}/update-mouse?x=${x}&y=${y}`;
   try {
     fetch(url, {
       mode: "no-cors",
-      cache: "no-store",
       method: "GET",
-    });
+    })
   } catch (e) {
     // currently a bug where the requests never fully complete but it mouse will move regardless...
   }
