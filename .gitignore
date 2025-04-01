@@ -1,3 +1,7 @@
 .vscode/settings.json
 extras/.DS_Store
 .DS_Store
+extras/yolov8n.onnx
+extras/simulation/Running.fbx
+extras/simulation/car.glb
+extras/nms-yolov8.onnx

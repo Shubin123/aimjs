@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>YOLOv8 Object Detection</title>
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <!-- OpenCV.js -->
+    <script
+      async
+      src="https://docs.opencv.org/4.5.2/opencv.js"
+      type="text/javascript"
+    ></script>
+    <!-- ONNX Runtime Web -->
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/onnxruntime-web/1.20.1/ort.webgpu.min.js"
+      integrity="sha512-VfhX+QkN7NbCrYehivVRUqfUdswaFcRPtmyBSMGIXGbIMRku82aqFB2mKxvrtNV9TYP6JWz371CfTIzAExMyCA=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+    <style>
+      body {
+        margin: 0;
+        /* overflow: hidden; */
+      }
+      canvas {
+        display: block;
+      }
+      #info {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 10px;
+        font-family: monospace;
+        pointer-events: none;
+      }
+      #canvas {
+        z-index: 1000;
+        translate: 0px 650px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Video Object Detection</h1>
+      <p>
+        YOLOv8 object detection application using <code>onnxruntime-web</code>.
+      </p>
+      <!-- <canvas id="canvas" width="640" height="640"></canvas> -->
+      <!-- <img id="video"width="640" height="640" /> -->
+      <canvas id="canvas" width="640" height="640"></canvas>
+
+      <!-- <img id="streamImages" style="display: none;"/> -->
+      <img id="streamImages" />
+
+      <div class="video-container">
+        <!-- <video id="video" muted autoplay style="display: none"></video> -->
+        <!-- <canvas id="canvas" width="640" height="640"></canvas> -->
+      </div>
+    </div>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://ga.jspm.io/npm:three@0.174.0/build/three.module.js",
+          "three/examples/jsm/loaders/GLTFLoader.js": "https://ga.jspm.io/npm:three@0.174.0/examples/jsm/loaders/GLTFLoader.js",
+          "three/examples/jsm/loaders/FBXLoader.js": "https://ga.jspm.io/npm:three@0.174.0/examples/jsm/loaders/FBXLoader.js"
+        }
+      }
+    </script>
+
+    <script type="module">
+      import * as THREE from "three";
+      import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
+      import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+      // Global variables
+      let session = null;
+      let videoSource = null;
+      let isPlaying = false;
+      let modelLoaded = false;
+      const modelInputShape = [1, 3, 640, 640];
+      const topk = 12;
+      const iouThreshold = 0.45;
+      const scoreThreshold = 0.25;
+      let objs = []; //includes fbx geo/mats
+      //   const videoElement = document.getElementById("video");
+      const canvasElement = document.getElementById("canvas");
+      //   canvasElement.style.translate = "0px 1000px";
+      //   canvasElement.style.display = "none";
+      const videoInput = document.getElementById("videoInput");
+
+      const streamImages = document.getElementById("streamImages");
+      // Initialize ONNX Runtime and OpenCV
+      async function initialize() {
+        console.log("Initializing OpenCV and ONNX Runtime...");
+        await cv["onRuntimeInitialized"];
+        console.log("OpenCV initialized.");
+
+        const arrBufNet = await download(`../yolov8n.onnx`); // put these two model files in the same directory as this html file
+        const arrBufNMS = await download(`../nms-yolov8.onnx`);
+
+        const yolov8 = await createSession(arrBufNet);
+        const nms = await createSession(arrBufNMS);
+
+        // Warmup model
+        const tensor = new ort.Tensor(
+          "float32",
+          new Float32Array(modelInputShape.reduce((a, b) => a * b)),
+          modelInputShape
+        );
+        await yolov8.run({ images: tensor });
+
+        session = { net: yolov8, nms: nms };
+        console.log("Model loaded and ready.");
+        let tn = document.createTextNode("ready!");
+        modelLoaded = true;
+
+        document.body.appendChild(tn);
+      }
+
+      // Create ONNX session
+      async function createSession(arrBuf, backend = "webgpu") {
+        const options = {
+          executionProviders: [backend],
+          intraOpNumThreads: navigator.hardwareConcurrency || 4,
+          graphOptimizationLevel: "all",
+          extra: {
+            session: {
+              disable_prepacking: "1",
+              use_device_allocator_for_initializers: "1",
+              use_ort_model_bytes_directly: "1",
+              use_ort_model_bytes_for_initializers: "1",
+            },
+          },
+        };
+
+        try {
+          ort.env.wasm.simd = true;
+          const session = await ort.InferenceSession.create(arrBuf, options);
+          return session;
+        } catch (error) {
+          console.warn(
+            `Failed to create session with ${backend}. Falling back to default provider.`,
+            error
+          );
+
+          return ort.InferenceSession.create(arrBuf, {
+            intraOpNumThreads: navigator.hardwareConcurrency || 4,
+          });
+        }
+      }
+
+      export const download = (url, logger = null) => {
+        return new Promise((resolve, reject) => {
+          const request = new XMLHttpRequest();
+          request.open("GET", url, true);
+          request.responseType = "arraybuffer";
+          request.onload = function () {
+            if (this.status >= 200 && this.status < 300) {
+              resolve(request.response);
+            } else {
+              reject({
+                status: this.status,
+                statusText: request.statusText,
+              });
+            }
+            resolve(request.response);
+          };
+          request.onerror = function () {
+            reject({
+              status: this.status,
+              statusText: request.statusText,
+            });
+          };
+          request.send();
+        });
+      };
+
+      window.onload = async function () {
+        await initialize();
+      };
+      let xRatio;
+      /**
+       * Detect Image
+       * @param {HTMLImageElement} image Image to detect
+       * @param {HTMLCanvasElement} canvas canvas to draw boxes
+       * @param {ort.InferenceSession} session YOLOv8 onnxruntime session
+       * @param {Number} topk Integer representing the maximum number of boxes to be selected per class
+       * @param {Number} iouThreshold Float representing the threshold for deciding whether boxes overlap too much with respect to IOU
+       * @param {Number} scoreThreshold Float representing the threshold for deciding when to remove boxes based on score
+       * @param {Number[]} inputShape model input shape. Normally in YOLO model [batch, channels, width, height]
+       */
+      export const detectImage = async (
+        image,
+        session,
+        topk,
+        iouThreshold,
+        scoreThreshold,
+        inputShape
+      ) => {
+        const [modelWidth, modelHeight] = inputShape.slice(2);
+
+        const tensor = new ort.Tensor("float32", image, inputShape); // to ort.Tensor
+        const config = new ort.Tensor(
+          "float32",
+          new Float32Array([
+            topk, // topk per class
+            iouThreshold, // iou threshold
+            scoreThreshold, // score threshold
+          ])
+        ); // nms config tensor
+        const { output0 } = await session.net.run({ images: tensor }); // run session and get output layer
+        const { selected } = await session.nms.run({
+          detection: output0,
+          config: config,
+        }); // perform nms and filter boxes
+        const boxes = [];
+        console.log(selected.dims[1]);
+        // looping through output
+        for (let idx = 0; idx < selected.dims[1]; idx++) {
+          const data = selected.data.slice(
+            idx * selected.dims[2],
+            (idx + 1) * selected.dims[2]
+          ); // get rows
+          const box = data.slice(0, 4);
+          const scores = data.slice(4); // classes probability scores
+          const score = Math.max(...scores); // maximum probability scores
+          const label = scores.indexOf(score); // class id of maximum probability scores
+
+          const [x, y, w, h] = [
+            (box[0] - 0.5 * box[2]) * xRatio, // upscale left
+            (box[1] - 0.5 * box[3]) * 1, // upscale top
+            box[2] * xRatio, // upscale width
+            box[3] * 1, // upscale height
+          ]; // keep boxes in maxSize range
+
+          boxes.push({
+            label: label,
+            probability: score,
+            bounding: [x, y, w, h], // upscale box
+          }); // update boxes to draw later
+        }
+        await renderBoxes(boxes); // Draw boxes
+        // input.delete(); // delete unused Mat
+      };
+
+      const labels = [
+        "person",
+        "bicycle",
+        "car",
+        "motorcycle",
+        "airplane",
+        "bus",
+        "train",
+        "truck",
+        "boat",
+        "traffic light",
+        "fire hydrant",
+        "stop sign",
+        "parking meter",
+        "bench",
+        "bird",
+        "cat",
+        "dog",
+        "horse",
+        "sheep",
+        "cow",
+        "elephant",
+        "bear",
+        "zebra",
+        "giraffe",
+        "backpack",
+        "umbrella",
+        "handbag",
+        "tie",
+        "suitcase",
+        "frisbee",
+        "skis",
+        "snowboard",
+        "sports ball",
+        "kite",
+        "baseball bat",
+        "baseball glove",
+        "skateboard",
+        "surfboard",
+        "tennis racket",
+        "bottle",
+        "wine glass",
+        "cup",
+        "fork",
+        "knife",
+        "spoon",
+        "bowl",
+        "banana",
+        "apple",
+        "sandwich",
+        "orange",
+        "broccoli",
+        "carrot",
+        "hot dog",
+        "pizza",
+        "donut",
+        "cake",
+        "chair",
+        "couch",
+        "potted plant",
+        "bed",
+        "dining table",
+        "toilet",
+        "tv",
+        "laptop",
+        "mouse",
+        "remote",
+        "keyboard",
+        "cell phone",
+        "microwave",
+        "oven",
+        "toaster",
+        "sink",
+        "refrigerator",
+        "book",
+        "clock",
+        "vase",
+        "scissors",
+        "teddy bear",
+        "hair drier",
+        "toothbrush",
+      ];
+
+      export const renderBoxes = async (boxes) => {
+        // Verify canvas and context
+        // if (!elem) {
+        //   console.error("Canvas is null or undefined");
+        //   return;
+        // }
+
+        // const ctx = elem.getContext("2d");
+        // if (!ctx) {
+        //   console.error("Failed to get 2d context");
+        //   // Log canvas dimensions and state
+        //   // console.log("Canvas dimensions:", {
+        //   //   width: canvas.width,
+        //   //   height: canvas.height,
+        //   //   clientWidth: canvas.clientWidth,
+        //   //   clientHeight: canvas.clientHeight,
+        //   // });
+
+        //   return;
+        // }
+
+        // Ensure canvas has dimensions
+        // if (canvas.width === 0 || canvas.height === 0) {
+        //   console.error("Canvas has zero dimensions");
+        //   return;
+        // }
+
+        // Clear with logging
+        // console.log("Clearing canvas...");
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+        const colors = new Colors();
+
+        // Calculate and verify font size
+        const fontSize = Math.max(Math.round(Math.max(640, 640) / 40), 14);
+        // console.log("Using font size:", fontSize);
+
+        // ctx.font = `${fontSize}px Arial`;
+        // ctx.textBaseline = "top";
+
+        // Add frame request to ensure rendering happens after GPU operations
+
+        boxes.forEach((box, index) => {
+          // Log each box being processed
+          // console.log(`Processing box ${index}:`, box);
+          // if (labels[box.label] != "person"){ return}
+
+          console.log(labels[box.label]);
+          const klass = labels[box.label];
+          const color = colors.get(box.label);
+          const score = (box.probability * 100).toFixed(1);
+          const [x1, y1, width, height] = box.bounding;
+
+          // Verify coordinates are valid numbers
+          if ([x1, y1, width, height].some((n) => !Number.isFinite(n))) {
+            console.error("Invalid coordinates for box:", box);
+            return;
+          }
+
+          // Draw box with semi-transparent fill
+          ctx.fillStyle = Colors.hexToRgba(color, 0.2);
+          ctx.fillRect(x1, y1, width, height);
+
+          // Draw border
+          ctx.strokeStyle = color;
+          ctx.lineWidth = Math.max(
+            Math.min(ctx.canvas.width, ctx.canvas.height) / 200,
+            2.5
+          );
+          ctx.strokeRect(x1, y1, width, height);
+
+          // Calculate and verify text dimensions
+          const labelText = `${klass} - ${score}%`;
+          const textWidth = ctx.measureText(labelText).width;
+          const textHeight = 10;
+          const yText = y1 - (textHeight + ctx.lineWidth);
+
+          // Draw label background
+          ctx.fillStyle = color;
+          ctx.fillRect(
+            x1 - 1,
+            yText < 0 ? 0 : yText,
+            textWidth + ctx.lineWidth,
+            textHeight + ctx.lineWidth
+          );
+
+          // Draw text
+          ctx.fillStyle = "#ffffff";
+          ctx.fillText(labelText, x1 - 1, yText < 0 ? 1 : yText + 1);
+        });
+
+        // await new Promise(requestAnimationFrame);
+
+        // Final verification log
+        // console.log("Rendering completed");
+      };
+
+      class Colors {
+        // ultralytics color palette https://ultralytics.com/
+        constructor() {
+          this.palette = [
+            "#FF3838",
+            "#FF9D97",
+            "#FF701F",
+            "#FFB21D",
+            "#CFD231",
+            "#48F90A",
+            "#92CC17",
+            "#3DDB86",
+            "#1A9334",
+            "#00D4BB",
+            "#2C99A8",
+            "#00C2FF",
+            "#344593",
+            "#6473FF",
+            "#0018EC",
+            "#8438FF",
+            "#520085",
+            "#CB38FF",
+            "#FF95C8",
+            "#FF37C7",
+          ];
+          this.n = this.palette.length;
+        }
+
+        get = (i) => this.palette[Math.floor(i) % this.n];
+
+        static hexToRgba = (hex, alpha) => {
+          var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+          return result
+            ? `rgba(${[
+                parseInt(result[1], 16),
+                parseInt(result[2], 16),
+                parseInt(result[3], 16),
+              ].join(", ")}, ${alpha})`
+            : null;
+        };
+      }
+
+      const infoElement = document.getElementById("info");
+
+      // Set up Three.js scene
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+      );
+      const renderer = new THREE.WebGLRenderer();
+      renderer.setSize(640, 640);
+      //   renderer.domElement.style.translate = "0 -600px";
+      document.body.appendChild(renderer.domElement);
+
+      // Add some content to the scene
+      const geometry = new THREE.BoxGeometry(4, 1, 1);
+
+      const material = new THREE.MeshBasicMaterial({ color: 0xdddddd });
+      const cube = new THREE.Mesh(geometry, material);
+      //   scene.add(cube);
+
+      const fbxLoader = new FBXLoader();
+      const gltfLoader = new GLTFLoader();
+      // Replace the box geometry code with FBX loading
+      fbxLoader.load(
+        // Path to your FBX file
+        "./running.fbx",
+
+        // onLoad callback
+        (fbx) => {
+          // Scale and position the model if needed
+          fbx.scale.set(1, 1, 1);
+          fbx.position.set(0, 0, 0);
+
+          // Add to scene
+          scene.add(fbx);
+          objs.push(fbx);
+
+          // Optional: Traverse and adjust materials
+          fbx.traverse((child) => {
+            if (child.isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+
+              // Adjust material if needed
+              if (child.material) {
+                child.material.metalness = 0;
+                child.material.roughness = 1;
+              }
+            }
+          });
+
+          console.log("FBX model loaded successfully");
+        },
+
+        // onProgress callback
+        (xhr) => {
+          console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+        },
+
+        // onError callback
+        (error) => {
+          console.error("Error loading FBX model:", error);
+        }
+      );
+
+      gltfLoader.load(
+        // Path to your GLB file
+        "./car.glb",
+
+        // onLoad callback
+        (gltf) => {
+          // The loaded model is in gltf.scene
+          const model = gltf.scene;
+
+          // Scale and position the model
+          model.scale.set(1, 1, 1); // Adjust as needed
+          model.position.set(0, 0, 0);
+          model.rotation.set(0, 0, 0);
+
+          // Add to scene
+          scene.add(model);
+          objs.push(model);
+          // Optional: Traverse and adjust materials/meshes
+          model.traverse((child) => {
+            if (child.isMesh) {
+              // Enable shadows if needed
+              child.castShadow = true;
+              child.receiveShadow = true;
+
+              // Adjust material properties
+              if (child.material) {
+                child.material.metalness = 0.1;
+                child.material.roughness = 0.5;
+                // child.material.envMap = environmentMap; // If using environment maps
+              }
+            }
+          });
+
+          console.log("GLB model loaded successfully", model);
+
+          // You can now access animations if your model has them:
+          if (gltf.animations && gltf.animations.length) {
+            const mixer = new THREE.AnimationMixer(model);
+            const action = mixer.clipAction(gltf.animations[0]);
+            action.play();
+
+            // Add mixer to your update loop
+            // function animate() {
+            //   mixer.update(deltaTime);
+            // }
+          }
+        },
+
+        // onProgress callback
+        (xhr) => {
+          console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+        },
+
+        // onError callback
+        (error) => {
+          console.error("Error loading GLB model:", error);
+        }
+      );
+
+      camera.position.z = 5;
+
+      // Add a light source
+      const light = new THREE.DirectionalLight(0xffffff, 1);
+      light.position.set(1, 1, 1).normalize();
+      scene.add(light);
+
+      // Create a render target for capturing the frame buffer
+      const renderTargetWidth = 128; // Small for performance
+      const renderTargetHeight = 128;
+      const renderTarget = new THREE.WebGLRenderTarget(
+        renderTargetWidth,
+        renderTargetHeight
+      );
+
+      // Setup message handler for worker responses
+      let lastResult = null;
+      //   if (e.data.status === 'modelLoaded') {
+      //     infoElement.textContent = 'Model loaded - Processing frames...';
+      //   } else if (e.data.status === 'complete') {
+      //     lastResult = e.data.result;
+      //     updateInfoDisplay(lastResult);
+      //   } else if (e.data.status === 'error') {
+      //     infoElement.textContent = 'Error: ' + e.data.message;
+      //   }
+      // };
+
+      //   function updateInfoDisplay(result) {
+      //     if (!result) return;
+
+      //     infoElement.innerHTML = `
+      //     Brightness: ${result.averageBrightness.toFixed(3)}<br>
+      //     Bright pixels: ${result.brightPixels}<br>
+      //     Dark pixels: ${result.darkPixels}<br>
+      //     Contrast ratio: ${result.contrastRatio.toFixed(2)}<br>
+      //     Frame: ${frameCount}
+      //   `;
+
+      //     // Update cube color based on brightness
+      //     const hue = Math.floor(result.averageBrightness * 360);
+      //     cube.material.color.setHSL(hue / 360, 1, 0.5);
+      //   }
+
+      let frameCount = 0;
+      //   let processingFrame = false;
+
+      // Animation loop
+      async function animate() {
+        requestAnimationFrame(animate);
+        // camera.rotation.y += 0.1;
+        // Rotate the cube
+        // cube.rotation.x += 0.01;
+        // cube.rotation.y += 0.01;
+        // cube.position.x = Math.sin(frameCount / 200);
+        objs.forEach((element) => {
+          element.rotation.y -= 0.005;
+          element.position.x = 2 * Math.sin(frameCount / 100);
+        });
+        // camera.rotation.y += 0.001;
+        // Render scene to render target
+        // renderer.setRenderTarget(renderTarget);
+        // renderer.render(scene, camera);
+        // renderer.setRenderTarget(null);
+
+        // Display the render on screen
+        renderer.render(scene, camera);
+
+        // Every N frames, send frame buffer to worker
+        if (frameCount % 100 === 0) {
+          await captureFrameAndProcess();
+        }
+        frameCount++;
+      }
+      const ctx = canvasElement.getContext("2d", { willReadFrequently: true });
+      // Function to capture frame buffer and send to worker
+      async function captureFrameAndProcess() {
+        if (!modelLoaded) return;
+        let imgsrc = await renderer.domElement.toDataURL();
+
+        streamImages.src = imgsrc;
+        streamImages.style.width = 640;
+        streamImages.style.height = 640;
+        // streamImages.style.translate = "0 -500px";
+        streamImages.style.zIndex = 0;
+        // let data = await prepareInputTensor(renderer);
+        // let data = await captureAndPreprocess(renderer);
+        // console.log(data);
+
+        streamImages.onload = async function () {
+          let mat = cv.imread(streamImages);
+          // console.log(mat);
+          const matC3 = new cv.Mat();
+          cv.cvtColor(mat, matC3, cv.COLOR_RGBA2BGR);
+          // //   console.log(mat)
+          //   // 7. Add padding to make square
+          const maxSize = Math.max(matC3.rows, matC3.cols);
+          const matPad = new cv.Mat();
+
+          xRatio = maxSize / matC3.cols; // set xRatio
+
+          const xPad = maxSize - matC3.cols; // set xPadding
+          const yPad = maxSize - matC3.rows; // set yPadding
+          const yRatio = maxSize / matC3.rows; // set yRatio
+          cv.copyMakeBorder(
+            matC3,
+            matPad,
+            0,
+            yPad,
+            0,
+            xPad,
+            cv.BORDER_CONSTANT
+          ); // padding black
+          //   // 8. Create the final blob
+          const blob = cv.blobFromImage(
+            matC3,
+            1.0 / 255.0, // Scale factor
+            new cv.Size(640, 640), // Target size
+            new cv.Scalar(0, 0, 0), // Mean subtraction
+            true, // Swap RB channels
+            false // Crop
+          );
+          //   console.log(matC3)
+
+          //   // 9. Clean up OpenCV objects
+          //   mat.delete();
+          //   matC3.delete();
+          //   matPad.delete();
+          // console.log(matPad.data32F)
+
+          //   matPad.data32F.forEach(element => {
+          //         if(element !=0)
+          //         {console.log(element)}
+          //   });
+          mat.delete();
+          matC3.delete();
+          matPad.delete();
+
+          await detectImage(blob.data32F, session, 1, 0.01, 0.01, [
+            1,
+            3,
+            canvasElement.width,
+            canvasElement.height,
+          ]);
+
+          blob.delete();
+        };
+      }
+
+      // Handle window resize
+      window.addEventListener("resize", function () {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      animate();
+    </script>
+  </body>
+</html>

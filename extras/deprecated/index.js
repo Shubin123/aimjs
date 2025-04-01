@@ -26,8 +26,8 @@ async function initialize() {
   console.log("OpenCV initialized.");
 
   
-  const arrBufNet = await download(`./yolov8n.onnx`); // put these two model files in the same directory as this html file
-  const arrBufNMS = await download(`./nms-yolov8.onnx`);
+  const arrBufNet = await download(`../yolov8n.onnx`); // put these two model files in the same directory as this html file
+  const arrBufNMS = await download(`../nms-yolov8.onnx`);
 
   const yolov8 = await createSession(arrBufNet);
   const nms = await createSession(arrBufNMS);
