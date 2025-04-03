@@ -54,14 +54,19 @@
       </p>
       <!-- <canvas id="canvas" width="640" height="640"></canvas> -->
       <!-- <img id="video"width="640" height="640" /> -->
+
       <canvas id="canvas" width="640" height="640"></canvas>
 
       <!-- <img id="streamImages" style="display: none;"/> -->
       <img id="streamImages" />
 
+
+
       <div class="video-container">
         <!-- <video id="video" muted autoplay style="display: none"></video> -->
         <!-- <canvas id="canvas" width="640" height="640"></canvas> -->
+         <label>ai tracking</label>
+        <input type="checkbox" id="moveCamera" checked>
       </div>
     </div>
     <script type="importmap">
@@ -69,7 +74,8 @@
         "imports": {
           "three": "https://ga.jspm.io/npm:three@0.174.0/build/three.module.js",
           "three/examples/jsm/loaders/GLTFLoader.js": "https://ga.jspm.io/npm:three@0.174.0/examples/jsm/loaders/GLTFLoader.js",
-          "three/examples/jsm/loaders/FBXLoader.js": "https://ga.jspm.io/npm:three@0.174.0/examples/jsm/loaders/FBXLoader.js"
+          "three/examples/jsm/loaders/FBXLoader.js": "https://ga.jspm.io/npm:three@0.174.0/examples/jsm/loaders/FBXLoader.js",
+          "three/src/math/MathUtils.js": "https://ga.jspm.io/npm:three@0.174.0/src/math/MathUtils.js"
         }
       }
     </script>
@@ -78,6 +84,7 @@
       import * as THREE from "three";
       import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
       import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+      import {  MathUtils } from "three/src/math/MathUtils.js";
       // Global variables
       let session = null;
       let videoSource = null;
@@ -95,11 +102,14 @@
       const videoInput = document.getElementById("videoInput");
 
       const streamImages = document.getElementById("streamImages");
+      const AIFRAMES = 50;
+      let rotationTarget = 0;
+      
+    
       // Initialize ONNX Runtime and OpenCV
       async function initialize() {
-        console.log("Initializing OpenCV and ONNX Runtime...");
-        await cv["onRuntimeInitialized"];
-        console.log("OpenCV initialized.");
+        // await cv["onRuntimeInitialized"];
+        
 
         const arrBufNet = await download(`../yolov8n.onnx`); // put these two model files in the same directory as this html file
         const arrBufNMS = await download(`../nms-yolov8.onnx`);
@@ -116,7 +126,7 @@
         await yolov8.run({ images: tensor });
 
         session = { net: yolov8, nms: nms };
-        console.log("Model loaded and ready.");
+        // console.log("Model loaded and ready.");
         let tn = document.createTextNode("ready!");
         modelLoaded = true;
 
@@ -220,7 +230,7 @@
           config: config,
         }); // perform nms and filter boxes
         const boxes = [];
-        console.log(selected.dims[1]);
+        // console.log(selected.dims[1]);
         // looping through output
         for (let idx = 0; idx < selected.dims[1]; idx++) {
           const data = selected.data.slice(
@@ -373,13 +383,15 @@
         // ctx.textBaseline = "top";
 
         // Add frame request to ensure rendering happens after GPU operations
+        let mainBox = null;
+        let maxArea = 0;
 
         boxes.forEach((box, index) => {
           // Log each box being processed
           // console.log(`Processing box ${index}:`, box);
           // if (labels[box.label] != "person"){ return}
 
-          console.log(labels[box.label]);
+          // console.log(labels[box.label]);
           const klass = labels[box.label];
           const color = colors.get(box.label);
           const score = (box.probability * 100).toFixed(1);
@@ -389,6 +401,12 @@
           if ([x1, y1, width, height].some((n) => !Number.isFinite(n))) {
             console.error("Invalid coordinates for box:", box);
             return;
+          }
+
+          const area = width * height;
+          if (area > maxArea) {
+            maxArea = area;
+            mainBox = box;
           }
 
           // Draw box with semi-transparent fill
@@ -422,6 +440,52 @@
           ctx.fillStyle = "#ffffff";
           ctx.fillText(labelText, x1 - 1, yText < 0 ? 1 : yText + 1);
         });
+
+        // Update camera rotation if camera is provided and we have a main box
+        if (camera && mainBox) {
+          const [x1, y1, width, height] = mainBox.bounding;
+    
+    // Convert box center to normalized device coordinates [-1, 1]
+    const boxCenterX = (x1 + width/2) / 640 * 2 - 1;
+    // const boxCenterY = -((y1 + height/2) / ctx.canvas.height * 2 - 1);
+    
+    // Calculate required rotation to keep box centered
+    const targetRotationY = Math.atan2(boxCenterX, 1) * 1; // Reduced sensitivity
+    
+    // Calculate required rotation to keep full box in view
+    // const boxRight = (x1 + width) / ctx.canvas.width * 2 - 1;
+    // const boxLeft = x1 / ctx.canvas.width * 2 - 1;
+    
+    // Dynamic field-of-view adjustment
+    // const boxWidthNDC = boxRight - boxLeft;
+    // const fovAdjustment = Math.min(1.5, Math.max(0.7, 1/(boxWidthNDC * 0.7)));
+    
+    // Smooth transitions
+    const lerpFactor = 0.8;
+    // console.log("tr", targetRotationY )
+    // console.log("r", camera.rotation.y )
+    // camera.rotation.y = 1
+          if(document.querySelector('#moveCamera').checked){
+            // camera.rotation.y = camera.rotation.y - targetRotationY;
+            
+            rotationTarget = camera.rotation.y - targetRotationY;
+    
+          }
+    // // Adjust FOV if camera supports it
+    // if (camera.fov) {
+    //   camera.fov = 50 * fovAdjustment;
+    //   camera.updateProjectionMatrix();
+    // }
+    
+    // // Optional: Adjust camera distance based on box size
+    // const boxDiagonal = Math.sqrt(width * width + height * height);
+    // const targetDistance = THREE.MathUtils.lerp(
+    //   camera.position.z,
+    //   5 + boxDiagonal * 0.05,
+    //   lerpFactor
+    // );
+    // camera.position.z = targetDistance;
+        }
 
         // await new Promise(requestAnimationFrame);
 
@@ -484,6 +548,7 @@
       const renderer = new THREE.WebGLRenderer();
       renderer.setSize(640, 640);
       //   renderer.domElement.style.translate = "0 -600px";
+      renderer.setClearColor(0x000000);
       document.body.appendChild(renderer.domElement);
 
       // Add some content to the scene
@@ -496,6 +561,7 @@
       const fbxLoader = new FBXLoader();
       const gltfLoader = new GLTFLoader();
       // Replace the box geometry code with FBX loading
+      try{
       fbxLoader.load(
         // Path to your FBX file
         "./running.fbx",
@@ -524,12 +590,12 @@
             }
           });
 
-          console.log("FBX model loaded successfully");
+          // console.log("FBX model loaded successfully");
         },
 
         // onProgress callback
         (xhr) => {
-          console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+          // console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
         },
 
         // onError callback
@@ -537,7 +603,9 @@
           console.error("Error loading FBX model:", error);
         }
       );
-
+      }
+        catch (e)
+        {}
       gltfLoader.load(
         // Path to your GLB file
         "./car.glb",
@@ -571,7 +639,7 @@
             }
           });
 
-          console.log("GLB model loaded successfully", model);
+          // console.log("GLB model loaded successfully", model);
 
           // You can now access animations if your model has them:
           if (gltf.animations && gltf.animations.length) {
@@ -588,7 +656,7 @@
 
         // onProgress callback
         (xhr) => {
-          console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+          // console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
         },
 
         // onError callback
@@ -605,12 +673,12 @@
       scene.add(light);
 
       // Create a render target for capturing the frame buffer
-      const renderTargetWidth = 128; // Small for performance
-      const renderTargetHeight = 128;
-      const renderTarget = new THREE.WebGLRenderTarget(
-        renderTargetWidth,
-        renderTargetHeight
-      );
+      // const renderTargetWidth = 128; // Small for performance
+      // const renderTargetHeight = 128;
+      // const renderTarget = new THREE.WebGLRenderTarget(
+      //   renderTargetWidth,
+      //   renderTargetHeight
+      // );
 
       // Setup message handler for worker responses
       let lastResult = null;
@@ -643,33 +711,63 @@
       let frameCount = 0;
       //   let processingFrame = false;
 
+      function* lerpCoroutine(startValue, endValue, duration, easingFn = null) {
+        const startTime = Date.now();
+        const endTime = startTime + duration;
+        
+        while (Date.now() < endTime) {
+          const currentTime = Date.now();
+          const elapsed = currentTime - startTime;
+          const progress = Math.min(elapsed / duration, 1); // Clamp between 0 and 1
+          
+          // Apply easing function if provided
+          const t = easingFn ? easingFn(progress) : progress;
+          
+          // Calculate interpolated value
+          const value = startValue + (endValue - startValue) * t;
+          
+          yield value;
+          
+          // Yield control back to the main loop
+          yield;
+        }
+        
+        // Ensure we end exactly at the target value
+        yield endValue;
+      }
+
       // Animation loop
       async function animate() {
         requestAnimationFrame(animate);
-        // camera.rotation.y += 0.1;
-        // Rotate the cube
-        // cube.rotation.x += 0.01;
-        // cube.rotation.y += 0.01;
-        // cube.position.x = Math.sin(frameCount / 200);
+
         objs.forEach((element) => {
           element.rotation.y -= 0.005;
-          element.position.x = 2 * Math.sin(frameCount / 100);
+          element.position.x = 10 *Math.pow( Math.sin(frameCount / 200),3);
         });
-        // camera.rotation.y += 0.001;
-        // Render scene to render target
-        // renderer.setRenderTarget(renderTarget);
-        // renderer.render(scene, camera);
-        // renderer.setRenderTarget(null);
 
-        // Display the render on screen
+
+  //       camera.rotation.y = MathUtils.lerp(
+  //   camera.rotation.y,
+  //   rotationTarget,
+  //   0.5
+  // );
+
+  camera.rotation.y = MathUtils.damp(
+    camera.rotation.y,
+    rotationTarget,
+    0.5, 
+    frameCount
+  );
+
         renderer.render(scene, camera);
 
         // Every N frames, send frame buffer to worker
-        if (frameCount % 100 === 0) {
+        if (frameCount % AIFRAMES === 0) {
           await captureFrameAndProcess();
         }
         frameCount++;
       }
+
       const ctx = canvasElement.getContext("2d", { willReadFrequently: true });
       // Function to capture frame buffer and send to worker
       async function captureFrameAndProcess() {
