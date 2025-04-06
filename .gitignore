@@ -5,3 +5,8 @@ extras/yolov8n.onnx
 extras/simulation/Running.fbx
 extras/simulation/car.glb
 extras/nms-yolov8.onnx
+extras/simulation/camCar.glb
+extras/simulation/yolov8n.onnx
+extras/simulation/nms-yolov8.onnx
+extras/simulation/line_follow.onnx
+extras/simulation/line.html
