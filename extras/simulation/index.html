@@ -94,13 +94,16 @@
           align-items: center;
         }
       }
+      input {
+        translate: -10px 0;
+      }
     </style>
   </head>
   <body>
     <!-- Header -->
     <div class="header text-center">
       <div class="container">
-        <h1>Video Object Detection</h1>
+        <h1>Game Object Detection</h1>
         <p class="lead">
           YOLOv8 object detection application using <code>onnxruntime-web</code>
         </p>
@@ -142,24 +145,39 @@
                 <input
                   class="form-check-input"
                   type="checkbox"
-                  id="showBoundingBoxes"
+                  id="enableTracking"
                   checked
                 />
-                <label class="form-check-label" for="showBoundingBoxes">
-                  <i class="bi bi-bounding-box"></i> Show Bounding Boxes
+                <label class="form-check-label" for="enableTracking">
+                  <i class="bi bi-sign-turn-slight-right"></i> Road Tracking
                 </label>
               </div>
               <div class="form-check form-switch">
                 <input
                   class="form-check-input"
                   type="checkbox"
-                  id="enableTracking"
+                  id="showBoundingBoxes"
                   checked
                 />
-                <label class="form-check-label" for="enableTracking">
-                  <i class="bi bi-record-circle"></i> Enable Tracking
+                <label class="form-check-label" for="showBoundingBoxes">
+                  <i class="bi bi-bounding-box"></i> Show processing data
                 </label>
               </div>
+
+              
+
+              <div class="form-check form-switch">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="moveForward"
+                  checked
+                />
+                <label class="form-check-label" for="moveForward">
+                  <i class="bi bi-car-front"></i> Move Car Forwards
+                </label>
+              </div>
+           
             </div>
           </div>
 
@@ -203,7 +221,8 @@
           "three/examples/jsm/loaders/GLTFLoader.js": "https://ga.jspm.io/npm:three@0.174.0/examples/jsm/loaders/GLTFLoader.js",
           "three/examples/jsm/loaders/FBXLoader.js": "https://ga.jspm.io/npm:three@0.174.0/examples/jsm/loaders/FBXLoader.js",
           "three/src/math/MathUtils.js": "https://ga.jspm.io/npm:three@0.174.0/src/math/MathUtils.js",
-          "three/examples/jsm/libs/stats.module.js": "https://ga.jspm.io/npm:three@0.174.0/examples/jsm/libs/stats.module.js"
+          "three/examples/jsm/libs/stats.module.js": "https://ga.jspm.io/npm:three@0.174.0/examples/jsm/libs/stats.module.js",
+          "three/examples/jsm/controls/OrbitControls.js": "https://ga.jspm.io/npm:three@0.174.0/examples/jsm/controls/OrbitControls.js"
         }
       }
     </script>
@@ -213,7 +232,10 @@
       import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
       import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
       import { MathUtils } from "three/src/math/MathUtils.js";
+      import {OrbitControls} from "three/examples/jsm/controls/OrbitControls.js";
       import * as Stats from "three/examples/jsm/libs/stats.module.js";
+
+
       // Global variables
       let stats = Stats.default.Panel();
 
@@ -239,6 +261,7 @@
       const raycaster = new THREE.Raycaster();
       const AIFRAMES = 100;
       let rotationTarget = 0;
+      let roadCameraAngle = 0; 
 
       // Initialize ONNX Runtime and OpenCV
       async function initialize() {
@@ -302,12 +325,12 @@
       }
 
       // Configuration
-      const IMAGE_SHAPE = { height: 66, width: 100, channels: 3 }; // Changed to 3 channels for RGB
+      const IMAGE_SHAPE = { height: 66, width: 100, channels: 1 }; // Changed to 3 channels for RGB
       const MODEL_INPUT_SHAPE = {
         batch: -1, // Dynamic batch size
         height: 66,
         width: 100,
-        channels: 3, // RGB
+        channels: 1, // RGB
       };
       let ortSession = null;
 
@@ -318,7 +341,7 @@
           ortSession = await ort.InferenceSession.create("line_follow.onnx");
 
           // Log model input details for debugging
-          console.log("Model inputs:", ortSession.inputNames);
+          // console.log("Model inputs:", ortSession.inputNames);
           // console.log('Input shape:', ortSession.inputs[0].dims);
 
           // document.getElementById('loading').textContent = 'Model loaded successfully!';
@@ -356,35 +379,41 @@
       };
 
       async function preprocessImageFO(imageElement) {
-        // const canvas = document.createElement('canvas');
-        // canvas.width = MODEL_INPUT_SHAPE.width;
-        // canvas.height = MODEL_INPUT_SHAPE.height;
-        // const ctx = canvas.getContext('2d');
+        const canvass = document.createElement("canvas");
+        canvass.width = MODEL_INPUT_SHAPE.width;
+        canvass.height = MODEL_INPUT_SHAPE.height;
+        const ctx2 = canvass.getContext("2d");
 
         // Draw and resize image (maintains aspect ratio with padding)
-        const aspect = imageElement.naturalWidth / imageElement.naturalHeight;
+        const aspect = 1;
         const targetAspect = MODEL_INPUT_SHAPE.width / MODEL_INPUT_SHAPE.height;
-
+        // console.log(imageElement)
         if (aspect > targetAspect) {
           // Wider than target - scale to width and pad top/bottom
           const scaledHeight = MODEL_INPUT_SHAPE.width / aspect;
-          // ctx.drawImage(
-          //     imageElement,
-          //     0, (MODEL_INPUT_SHAPE.height - scaledHeight) / 2,
-          //     MODEL_INPUT_SHAPE.width, scaledHeight
-          // );
+          ctx2.drawImage(
+            imageElement,
+            0,
+            (MODEL_INPUT_SHAPE.height - scaledHeight) / 2,
+            MODEL_INPUT_SHAPE.width,
+            scaledHeight
+          );
         } else {
           // Taller than target - scale to height and pad left/right
           const scaledWidth = MODEL_INPUT_SHAPE.height * aspect;
-          // ctx.drawImage(
-          //     imageElement,
-          //     (MODEL_INPUT_SHAPE.width - scaledWidth) / 2, 0,
-          //     scaledWidth, MODEL_INPUT_SHAPE.height
-          // );
+          ctx2.drawImage(
+            imageElement,
+            (MODEL_INPUT_SHAPE.width - scaledWidth) / 2,
+            0,
+            scaledWidth,
+            MODEL_INPUT_SHAPE.height
+          );
         }
 
+
+
         // Get image data (RGB)
-        const imageData = ctx.getImageData(
+        const imageData = ctx2.getImageData(
           0,
           0,
           MODEL_INPUT_SHAPE.width,
@@ -398,11 +427,20 @@
             MODEL_INPUT_SHAPE.channels
         );
 
-        for (let i = 0; i < imageData.data.length; i += 4) {
-          const pixelIndex = Math.floor(i / 4);
-          tensorData[pixelIndex * 3] = imageData.data[i] / 255.0; // R
-          tensorData[pixelIndex * 3 + 1] = imageData.data[i + 1] / 255.0; // G
-          tensorData[pixelIndex * 3 + 2] = imageData.data[i + 2] / 255.0; // B
+        // for (let i = 0; i < imageData.data.length; i += 4) {
+        //   const pixelIndex = Math.floor(i / 4);
+        //   tensorData[pixelIndex * 3] = imageData.data[i] / 255.0; // R
+        //   tensorData[pixelIndex * 3 + 1] = imageData.data[i + 1] / 255.0; // G
+        //   tensorData[pixelIndex * 3 + 2] = imageData.data[i + 2] / 255.0; // B
+        // }
+
+        for (let i = 0, j = 0; i < imageData.data.length; i += 4, j++) {
+          // Using luminance formula (REC.601)
+          tensorData[j] =
+            (0.299 * imageData.data[i] + // R
+              0.587 * imageData.data[i + 1] + // G
+              0.114 * imageData.data[i + 2]) / // B
+            255.0; // Normalize to [0,1]
         }
 
         // Create tensor with shape [1, height, width, channels]
@@ -447,7 +485,7 @@
           const results = await ortSession.run({
             [ortSession.inputNames[0]]: tensor,
           });
-          const predictions = results[ortSession.outputNames[0]].data;
+          const predictions = results[ortSession.outputNames[0]].data[0];
 
           // Display results
           // updateProgress(90, 'Displaying results...');
@@ -459,9 +497,9 @@
           // updateProgress(100, 'Prediction complete!');
           return predictions;
         } catch (error) {
-          console.error("Prediction error:", error);
+          console.error("error", error);
           // updateProgress(0, `Error: ${error.message}`);
-          throw error;
+          // throw error;
         }
       }
 
@@ -683,36 +721,43 @@
             mainBox = box;
           }
 
-          // Draw box with semi-transparent fill
-          ctx.fillStyle = Colors.hexToRgba(color, 0.2);
-          ctx.fillRect(x1, y1, width, height);
+          if (document.querySelector("#showBoundingBoxes").checked) {
+            // Draw box with semi-transparent fill
+            ctx.fillStyle = Colors.hexToRgba(color, 0.2);
+            ctx.fillRect(x1, y1, width, height);
 
-          // Draw border
-          ctx.strokeStyle = color;
-          ctx.lineWidth = Math.max(
-            Math.min(ctx.canvas.width, ctx.canvas.height) / 200,
-            2.5
-          );
-          ctx.strokeRect(x1, y1, width, height);
+            // Draw border
+            ctx.strokeStyle = color;
+            ctx.lineWidth = Math.max(
+              Math.min(ctx.canvas.width, ctx.canvas.height) / 200,
+              2.5
+            );
+            ctx.strokeRect(x1, y1, width, height);
 
-          // Calculate and verify text dimensions
-          const labelText = `${klass} - ${score}%`;
-          const textWidth = ctx.measureText(labelText).width;
-          const textHeight = 10;
-          const yText = y1 - (textHeight + ctx.lineWidth);
+            // Calculate and verify text dimensions
+            const labelText = `${klass} - ${score}%`;
+            const textWidth = ctx.measureText(labelText).width;
+            const textHeight = 10;
+            const yText = y1 - (textHeight + ctx.lineWidth);
 
-          // Draw label background
-          ctx.fillStyle = color;
-          ctx.fillRect(
-            x1 - 1,
-            yText < 0 ? 0 : yText,
-            textWidth + ctx.lineWidth,
-            textHeight + ctx.lineWidth
-          );
+            // Draw label background
+            ctx.fillStyle = color;
+            ctx.fillRect(
+              x1 - 1,
+              yText < 0 ? 0 : yText,
+              textWidth + ctx.lineWidth,
+              textHeight + ctx.lineWidth
+            );
 
-          // Draw text
-          ctx.fillStyle = "#000000";
-          ctx.fillText(labelText, x1 - 1, yText < 0 ? 1 : yText + 1);
+            // Draw text
+            ctx.fillStyle = "#000000";
+            ctx.fillText(labelText, x1 - 1, yText < 0 ? 1 : yText + 1);
+          }
+
+          if (document.querySelector("#enableTracking").checked)
+          {
+            ctx.fillText(` predicted (yaw) ${roadCameraAngle}`, 0, 630)
+          }
         });
 
         // Update camera rotation if camera is provided and we have a main box
@@ -741,7 +786,6 @@
           // camera.rotation.y = 1
           if (document.querySelector("#moveCamera").checked) {
             // camera.rotation.y = camera.rotation.y - targetRotationY;
-
             rotationTarget = camera2.rotation.y - targetRotationY;
           }
           // // Adjust FOV if camera supports it
@@ -812,11 +856,11 @@
 
       // Set up Three.js scene
       const scene = new THREE.Scene();
-      const aspect = 1.77777777778;
+      const aspect = 1.5;
 
       // Set reasonable dimensions for your orthographic view
 
-      // Create OrthographicCamera
+      // Create top cam
       const camera = new THREE.PerspectiveCamera(
         75,
         window.innerWidth / window.innerHeight,
@@ -824,8 +868,10 @@
         1000 // far
       );
 
+      
       camera.layers.enable(1);
 
+      // create car cam
       const camera2 = new THREE.PerspectiveCamera(
         75,
         window.innerWidth / window.innerHeight,
@@ -833,19 +879,22 @@
         1000
       );
 
+      
+
+
       const distance = 10; // Distance from center
       camera.position.set(distance, distance, distance);
       camera.lookAt(0, 0, 0);
-      // camera2.layers.enable(2)
-      // camera2.rotation.x = -0.5;
-      // camera2.rotation.z =  -0.5;
+
 
       const renderer = new THREE.WebGLRenderer();
       renderer.setSize(640, 640);
       camera.aspect = window.innerWidth / window.innerHeight;
       renderer.domElement.style.position = "absolute";
 
-      const container = document.getElementById('data-engine-container');
+      const controls = new OrbitControls( camera, renderer.domElement );
+      controls.enableDamping = true;
+      const container = document.getElementById("data-engine-container");
 
       // renderer.domElement.style.translate = "750px -730px";
       // Resize();
@@ -853,7 +902,7 @@
       // renderer.domElement.style.width = "50%";
       // renderer.domElement.style.height = "50%";
 
-      renderer.setClearColor(0xffffff); //background color
+      renderer.setClearColor(0xbd8448); //background color
       // renderer.setClearColor(0xf8f9fa); //background color
       // document.body.appendChild(renderer.domElement);
       container.appendChild(renderer.domElement);
@@ -870,47 +919,48 @@
       const gltfLoader = new GLTFLoader();
       // Replace the box geometry code with FBX loading
 
-      // fbxLoader.load(
-      //   // Path to your FBX file
-      //   "./running.fbx",
+      fbxLoader.load(
+        // Path to your FBX file
+        "./track.fbx",
 
-      //   // onLoad callback
-      //   (fbx) => {
-      //     // Scale and position the model if needed
-      //     fbx.scale.set(1, 1, 1);
-      //     fbx.position.set(0, 0, 0);
+        // onLoad callback
+        (fbx) => {
+          // Scale and position the model if needed
+          let scale = 0.01;
+          fbx.scale.set(scale, scale, scale);
+          fbx.position.set(0, -1.5, 0);
 
-      //     // Add to scene
-      //     scene.add(fbx);
-      //     objs.push(fbx);
+          // Add to scene
+          scene.add(fbx);
+          objs.push(fbx);
 
-      //     // Optional: Traverse and adjust materials
-      //     fbx.traverse((child) => {
-      //       if (child.isMesh) {
-      //         child.castShadow = true;
-      //         child.receiveShadow = true;
+          // Optional: Traverse and adjust materials
+          fbx.traverse((child) => {
+            if (child.isMesh) {
+              // child.castShadow = true;
+              // child.receiveShadow = true;
 
-      //         // Adjust material if needed
-      //         if (child.material) {
-      //           child.material.metalness = 0;
-      //           child.material.roughness = 1;
-      //         }
-      //       }
-      //     });
+              // Adjust material if needed
+              if (child.material) {
+                child.material.metalness = 0;
+                child.material.roughness = 1;
+              }
+            }
+          });
 
-      //     // console.log("FBX model loaded successfully");
-      //   },
+          // console.log("FBX model loaded successfully");
+        },
 
-      //   // onProgress callback
-      //   (xhr) => {
-      //     // console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
-      //   },
+        // onProgress callback
+        (xhr) => {
+          // console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+        },
 
-      //   // onError callback
-      //   (error) => {
-      //     console.error("Error loading FBX model:", error);
-      //   }
-      // );
+        // onError callback
+        (error) => {
+          console.error("Error loading FBX model:", error);
+        }
+      );
 
       gltfLoader.load(
         // Path to your GLB file
@@ -1039,11 +1089,15 @@
       );
 
       camera2.position.z = 5;
+      // camera2.rotation.x = -0.2;
+
       camera.position.z = 15;
 
       // Add a light source
-      const light = new THREE.DirectionalLight(0xffffff, 1);
+      const light = new THREE.DirectionalLight(0xffffff, 5);
       light.position.set(1, 1, 1).normalize();
+
+      const alight = new THREE.AmbientLight(0xffffff, 1);
       scene.add(light);
 
       let lastResult = null;
@@ -1052,15 +1106,32 @@
       // Animation loop
       async function animate() {
         requestAnimationFrame(animate);
+        controls.update();
+
+      
+
+
         objs.forEach((element) => {
           // element.rotation.y -= 0.0005;
-          element.position.x = 10 * Math.pow(Math.sin(frameCount / 600), 1);
+          // element.position.x = 10 * Math.pow(Math.sin(frameCount / 600), 1);
         });
 
         camera2.rotation.y = rotationTarget;
 
         if (camModel) {
+
           camModel.rotation.y = camera2.rotation.y + 3.14;
+
+
+          if (document.querySelector("#moveForward").checked)
+          {
+            const forwardVector1 = camera2.getWorldDirection(new THREE.Vector3());
+            const forwardVector2 = camModel.getWorldDirection(new THREE.Vector3());
+          // Move camera forward along its own forward direction
+          // camera2.position.add(forwardVector.multiplyScalar(0.3)); // add a moveSpeed factor
+          camModel.position.add(forwardVector2.multiplyScalar(0.04)); // add a moveSpeed factor
+          camera2.position.add(forwardVector1.multiplyScalar(0.04)); // add a moveSpeed factor
+          }
         }
 
         renderer.render(scene, camera2);
@@ -1086,7 +1157,7 @@
       async function captureFrameAndProcess() {
         if (!modelLoaded) return;
         let imgsrc = await renderer.domElement.toDataURL();
-        // console.log(await predictFO(await(preprocessImageFO(imgsrc))));
+
         streamImages.src = imgsrc;
         streamImages.style.width = 640;
         streamImages.style.height = 640;
@@ -1097,6 +1168,30 @@
         // console.log(data);
 
         streamImages.onload = async function () {
+
+          if (document.querySelector("#enableTracking").checked){
+          roadCameraAngle = await predictFO(
+            await preprocessImageFO(streamImages)
+          ) - 90;
+          
+
+          // console.log(
+          //   "predicted track yaw change degrees",
+          //   roadCameraAngle
+          // );
+          rotationTarget += ((roadCameraAngle) * Math.PI) / 180.0;
+          }
+
+          // if (document.querySelector("#moveForward").checked)
+          // {
+          //   const forwardVector = camera2.getWorldDirection(new THREE.Vector3());
+          // // Move camera forward along its own forward direction
+          // camera2.position.add(forwardVector.multiplyScalar(1)); // add a moveSpeed factor
+          // camModel.position.add(forwardVector.multiplyScalar(1)); // add a moveSpeed factor
+          // }
+
+
+
           let mat = cv.imread(streamImages);
           // console.log(mat);
           const matC3 = new cv.Mat();
@@ -1166,23 +1261,24 @@
 
       let draggedObject;
 
-      window.addEventListener("pointermove", onPointerDown);
+      window.addEventListener("pointerdown", onPointerDown);
 
       window.addEventListener("pointermove", onPointerMove);
       window.addEventListener("pointerup", onPointerUp);
-   
+
       function onPointerDown(event) {
+       
         // console.log("cl");
         // Calculate pointer position in normalized device coordinates
         // pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
         // pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
         const rect = renderer.domElement.getBoundingClientRect();
-const x = event.clientX - rect.left;
-const y = event.clientY - rect.top;
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
 
-pointer.x = ( x / canvas.clientWidth ) *  2 - 1;
-pointer.y = ( y / canvas.clientHeight) * - 2 + 1
+        pointer.x = (x / canvas.clientWidth) * 2 - 1;
+        pointer.y = (y / canvas.clientHeight) * -2 + 1;
 
         checkIntersections(); // only functional in full screen
       }
@@ -1222,7 +1318,16 @@ pointer.y = ( y / canvas.clientHeight) * - 2 + 1
           draggedObject.position.add(moveZ);
 
           // Lift object while dragging
-          draggedObject.position.y = 0.7;
+          // draggedObject.position.y = -2;
+
+          if (draggedObject.uuid == camModel.uuid) {
+            camera2.position.add(moveX);
+            camera2.position.add(moveZ);
+
+            // Lift object while dragging
+            // camera2.position.y = 0.7;
+          }
+          // console.log(camModel.position)
         } else {
           // Initialize previous positions
           prevX = event.clientX;
@@ -1233,7 +1338,8 @@ pointer.y = ( y / canvas.clientHeight) * - 2 + 1
       function onPointerUp(event) {
         // console.log("stopped");
         if (draggedObject) {
-          draggedObject.position.y = 0;
+          // draggedObject.position.y = 0;
+          controls.enabled = true;
           draggedObject = null;
         }
       }
@@ -1244,20 +1350,20 @@ pointer.y = ( y / canvas.clientHeight) * - 2 + 1
         raycaster.setFromCamera(pointer, camera);
         raycaster.layers.enable(1);
         // console.log(camera.layers,camera2.layers, camModel)
-        console.log("wow")
+        // console.log("wow")
         // Check intersections
         const intersects = raycaster.intersectObjects(scene.children);
         // Do something with intersections
         if (intersects.length > 0) {
+          controls.enabled = false;
           // intersects[0].object.material.wireframe = true;
           // intersects[0].object.position.y =
           // console.log(intersects)
-          console.log("found object");
+          // console.log("found object");
           intersects.forEach((element) => {
             // console.log(mostParent(element.object));
             draggedObject = mostParent(element.object);
             // draggedObject.position.y = 10;
-            // console.log(a)
           });
           // console.log(intersects[0].object.parent.parent);
 

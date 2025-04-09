@@ -10,3 +10,6 @@ extras/simulation/yolov8n.onnx
 extras/simulation/nms-yolov8.onnx
 extras/simulation/line_follow.onnx
 extras/simulation/line.html
+extras/simulation/goodest.onnx
+extras/simulation/demo.onnx
+extras/simulation/track.fbx
