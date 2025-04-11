@@ -39,3 +39,5 @@
 The original version of this project based on modifying [Hyuto/yolov8-onnxruntime-web](https://github.com/Hyuto/yolov8-onnxruntime-web) is available in [./extras/deprecated/](./extras/deprecated) as a standalone **you'll need to get yolo and the nms model yourself** [see additional readme](./extras/readme.md)
 
 The past progress videos using the onnxruntime-web in [./extras/media](./extras/media)
+
+
