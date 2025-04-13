@@ -147,7 +147,7 @@
           <canvas id="canvas" width="640" height="640"></canvas>
           <img id="streamImages" width="640" height="640" />
           
-          <div class="trackingSpeed "><input id="speedSlider" onchange="speedSlider(); this.nextElementSibling.value = this.value" type="range" min="30" max="100" step="1"><output style="margin-right: 1%">65 </output><i class="bi bi-speedometer"></i> Tracking Speed </div>
+          <div class="trackingSpeed "><input id="speedSlider" onchange="window.AIFRAMES = Math.round(-100*this.value+125),this.nextElementSibling.value = 100/window.AIFRAMES" type="range" min="0" max="1" step="0.01"><output style="margin-right: 1%">1</output><i class="bi bi-speedometer"></i> Tracking Speed </div>
           <div class="trackingSpeed "><input id="speedSlider" onchange="carSpeedSlider(); this.nextElementSibling.value = this.value" type="range" min="30" max="100" step="1"><output style="margin-right: 1%">65 </output><i class="bi bi-speedometer"></i> Car Speed</div>
         </div>
 
@@ -284,17 +284,19 @@
       }
     </script> -->
     <script>
-
+      // since we are already in a render loop when these functions are called,
+      // using onchange intead of oninput in the html hook is neccessary.
        function speedSlider()
        {  
+        console.log(Math.round(-100*document.getElementById("speedSlider").value + 125))
+        // window.AIFRAMES =  document.getElementById("speedSlider").value;
 
-        window.AIFRAMES =  document.getElementById("speedSlider").value;
        }
 
-       function speedSlider()
+       function carSpeedSlider()
        {  
 
-        window.AIFRAMES =  document.getElementById("speedSlider").value;
+        // window.AIFRAMES =  document.getElementById("speedSlider").value;
        }
 
 
@@ -322,6 +324,11 @@
       const scoreThreshold = 0.25;
       const pointer = new THREE.Vector2();
       
+      const MIN_DISTANCE = 5;   // Minimum expected distance
+        const MAX_DISTANCE = 50;  // Maximum expected distance
+        const MIN_SENSITIVITY = 0.5;  // Sensitivity at max distance
+        // const MAX_SENSITIVITY = 2.0;  // Sensitivity at min distance
+
       let objs = []; //includes fbx geo/mats
       //   const videoElement = document.getElementById("video");
       const canvasElement = document.getElementById("canvas");
@@ -339,7 +346,7 @@
 
 
       const raycaster = new THREE.Raycaster();
-      let AIFRAMES = 32;
+      let AIFRAMES = 75;
       window.AIFRAMES = AIFRAMES;
       let rotationTarget = 0;
       let roadCameraAngle = 0;
@@ -1199,7 +1206,6 @@
       async function animate() {
         controls.update();
         stats.update();
-
         objs.forEach((element) => {
           // element.rotation.y -= 0.0005;
           // element.position.x = 10 * Math.pow(Math.sin(frameCount / 600), 1);
@@ -1386,14 +1392,25 @@
         pointer.x = (x / (canvas.clientWidth* parentScale)) * 2 - 1;
         pointer.y = (y / (canvas.clientHeight * parentScale)) * -2 + 1;
 
-        checkIntersections(); // only functional in full screen
+        sens = checkIntersections(); // only functional in full screen
       }
 
       let prevX = 0;
       let prevY = 0;
+
+      let carXZ = [0,0]; 
+      let carXZV = [0,0]; 
+      
+      function smoothstep(min, max, value) {
+    const x = Math.max(0, Math.min(1, (value - min)/(max - min)));
+    return x*x*(3 - 2*x);
+}
+
+  let sens;
       function onPointerMove(event) {
         if (draggedObject) {
           // Calculate mouse movement differences
+        
           const mouseDeltaX = event.clientX - prevX;
           const mouseDeltaY = event.clientY - prevY;
 
@@ -1402,7 +1419,7 @@
           prevY = event.clientY;
 
           // Camera-relative movement vectors
-          const sensitivity = 0.05;
+          const sensitivity = sens? sens : 0.05;
 
           // Get camera's right vector (for horizontal movement)
           const right = new THREE.Vector3();
@@ -1418,21 +1435,41 @@
           // Calculate movement in world space
           const moveX = right.multiplyScalar(mouseDeltaX * sensitivity);
           const moveZ = forward.multiplyScalar(-mouseDeltaY * sensitivity); // Negative Y
-
+          
           // Apply movement to object
+          if(moveX.length() < sensitivity*10){
           draggedObject.position.add(moveX);
+          }
+          if (moveZ.length() < sensitivity*10){
           draggedObject.position.add(moveZ);
-
+          }
+          console.log(sens)
+          
           // Lift object while dragging
           // draggedObject.position.y = -2;
 
           if (draggedObject.uuid == camModel.uuid) {
             camera2.position.add(moveX);
             camera2.position.add(moveZ);
-
-            // Lift object while dragging
-            // camera2.position.y = 0.7;
           }
+          if (draggedObject.uuid == objs[1].uuid)
+          {
+            carXZV = [draggedObject.position.x - carXZ[0], draggedObject.position.z - carXZ[1]];
+            carXZ = [draggedObject.position.x, draggedObject.position.z];
+            if (Math.abs(carXZV[0]) < 0.001 && Math.abs(carXZV[1]) < 0.001) return;
+
+
+            const targetAngle = Math.atan2(carXZV[0], carXZV[1]);
+
+          const currentAngle = draggedObject.rotation.y;
+            let angleDifference = targetAngle - currentAngle;
+
+            angleDifference = ((angleDifference + Math.PI) % (2 * Math.PI)) - Math.PI;
+
+            // Apply damping (adjust 0.1 for smoothing speed)
+            draggedObject.rotation.y = currentAngle + 0.1 * angleDifference;
+          }
+
           // console.log(camModel.position)
         } else {
           // Initialize previous positions
@@ -1460,7 +1497,17 @@
         // Check intersections
         const intersects = raycaster.intersectObjects(scene.children);
         // Do something with intersections
+       
+        
+       
         if (intersects.length > 0) {
+         
+          
+        //    // Linear interpolation of sensitivity based on distance
+         
+        
+        // Ensure sensitivity stays within bounds
+        
           controls.enabled = false;
           // intersects[0].object.material.wireframe = true;
           // intersects[0].object.position.y =
@@ -1474,7 +1521,9 @@
           // console.log(intersects[0].object.parent.parent);
 
           // console.log(pointer.x,pointer.y)
+          return intersects[0].distance*0.005;
         }
+        return false;
       }
 
       function mostParent(obj) {
