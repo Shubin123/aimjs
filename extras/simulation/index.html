@@ -1407,6 +1407,7 @@
 }
 
   let sens;
+  let firstMove;
       function onPointerMove(event) {
         if (draggedObject) {
           // Calculate mouse movement differences
@@ -1437,13 +1438,14 @@
           const moveZ = forward.multiplyScalar(-mouseDeltaY * sensitivity); // Negative Y
           
           // Apply movement to object
-          if(moveX.length() < sensitivity*10){
+          if(firstMove){
           draggedObject.position.add(moveX);
-          }
-          if (moveZ.length() < sensitivity*10){
           draggedObject.position.add(moveZ);
+          } else 
+          {
+            firstMove = true;
           }
-          console.log(sens)
+
           
           // Lift object while dragging
           // draggedObject.position.y = -2;
@@ -1484,6 +1486,7 @@
           // draggedObject.position.y = 0;
           controls.enabled = true;
           draggedObject = null;
+          firstMove = false;
         }
       }
 
