@@ -116,12 +116,15 @@
       input {
         translate: -10px 0;
       }
-      .trackingSpeed
-      {
-        translate: 10px 640px;
-        display: inline-block;
-        width: 300px;
-      }
+      .trackingSpeed {
+  translate: 10px 640px;
+  display: inline-block;
+  width: 300px;
+}
+.newFile
+{
+  translate: 660px 615px;
+}
       .checkBoxes{
         margin-top: 2%; 
       }
@@ -147,8 +150,30 @@
           <canvas id="canvas" width="640" height="640"></canvas>
           <img id="streamImages" width="640" height="640" />
           
-          <div class="trackingSpeed "><input id="speedSlider" onchange="window.AIFRAMES = Math.round(-100*this.value+125),this.nextElementSibling.value = 100/window.AIFRAMES" type="range" min="0" max="1" step="0.01"><output style="margin-right: 1%">1</output><i class="bi bi-speedometer"></i> Tracking Speed </div>
-          <div class="trackingSpeed "><input id="speedSlider" onchange="carSpeedSlider(); this.nextElementSibling.value = this.value" type="range" min="30" max="100" step="1"><output style="margin-right: 1%">65 </output><i class="bi bi-speedometer"></i> Car Speed</div>
+         
+          <div class="trackingSpeed">
+            <input id="trackingSpeedSlider" onchange="window.AIFRAMES = Math.round(-100*this.value+125),this.nextElementSibling.value = (100/window.AIFRAMES).toFixed(1)" type="range" min="0" max="1" step="0.01">
+            <output style="margin-right: 1%">0.5</output>
+            <i class="bi bi-speedometer"></i> Tracking Speed
+          </div>
+          
+          <div class="trackingSpeed">
+            <input id="carSpeedSlider" onchange="window.carSpeed = this.value, this.nextElementSibling.value =this.value" type="range" min="0" max="1" step="0.01">
+            <output style="margin-right: 1%">0.5</output>
+            <i class="bi bi-speedometer"></i> Car Speed
+          </div>
+          
+
+          <div class="mb-3 newFile">
+            <!-- <label for="fileInput" class="form-label">Select GLB File</label> -->
+            <input class="form-control" type="file" id="fileInput" accept="*" multiple onchange="handleFileUpload(this.files[0])">
+        </div>
+        
+          <!-- <div class="newFile">
+            <button class="btn btn-primary" type="button" onclick="addGlb('cake.glb')">
+              <i class="bi bi-check-circle"></i> add new object
+            </button>
+          </div> -->
         </div>
 
         <!-- Three.js Engine Canvas -->
@@ -274,31 +299,22 @@
       }
     </script>
 
-    <!-- <script type="importmap">
-      {
-        "imports": {
-          "three": "https://cdn.skypack.dev/three@0.149.0/build/three.module",
-          "three/": "https://cdn.skypack.dev/three@0.149.0/",      
-          "dat.gui": "https://cdn.skypack.dev/dat.gui"
-        }
-      }
-    </script> -->
+
     <script>
-      // since we are already in a render loop when these functions are called,
-      // using onchange intead of oninput in the html hook is neccessary.
-       function speedSlider()
-       {  
-        console.log(Math.round(-100*document.getElementById("speedSlider").value + 125))
-        // window.AIFRAMES =  document.getElementById("speedSlider").value;
-
-       }
-
-       function carSpeedSlider()
-       {  
-
-        // window.AIFRAMES =  document.getElementById("speedSlider").value;
-       }
-
+    function handleFileUpload(file) {
+    if (!file) return;
+      let extension = file.name.split('.').pop()
+        
+    const url = URL.createObjectURL(file);
+      if (extension == "glb"){
+    addGlb(url); // Cleanup after load
+      }
+      if (extension  == "fbx")
+      {
+    addFbx(url);
+      }
+  }
+  // window.handleFileUpload = handleFileUpload();
 
     </script>
 
@@ -350,7 +366,9 @@
       window.AIFRAMES = AIFRAMES;
       let rotationTarget = 0;
       let roadCameraAngle = 0;
-
+      let carSpeed = 0.2;
+      window.carSpeed = 0.2;
+      
       // Initialize ONNX Runtime and OpenCV
       async function initialize() {
         // await cv["onRuntimeInitialized"];
@@ -1121,6 +1139,10 @@
         }
       );
 
+
+
+      // addGlb("./cake.glb");
+
       gltfLoader.load(
         // Path to your GLB file
         "./camCar.glb",
@@ -1234,8 +1256,8 @@
             );
             // Move camera forward along its own forward direction
             // camera2.position.add(forwardVector.multiplyScalar(0.3)); // add a moveSpeed factor
-            camModel.position.add(forwardVector2.multiplyScalar(0.2)); // add a moveSpeed factor
-            camera2.position.add(forwardVector1.multiplyScalar(0.2)); // add a moveSpeed factor
+            camModel.position.add(forwardVector2.multiplyScalar(window.carSpeed)); // add a moveSpeed factor
+            camera2.position.add(forwardVector1.multiplyScalar(window.carSpeed)); // add a moveSpeed factor
           }
         }
 
@@ -1371,7 +1393,114 @@
 
       window.addEventListener("resize", resizeEvent);
 
- 
+      export function addGlb(glbname){
+        gltfLoader.load(
+        // Path to your GLB file
+        glbname,
+
+        // onLoad callback
+        (gltf) => {
+          // The loaded model is in gltf.scene
+          const model = gltf.scene;
+
+          // Scale and position the model
+          model.scale.set(1, 1, 1); // Adjust as needed
+          model.position.set(0, 0, 0);
+          model.rotation.set(0, 0, 0);
+
+          // Add to scene
+          scene.add(model);
+          // objs.push(model);
+          // Optional: Traverse and adjust materials/meshes
+          model.traverse((child) => {
+            if (child.isMesh) {
+              // Enable shadows if needed
+              child.castShadow = true;
+              child.receiveShadow = true;
+
+              // Adjust material properties
+              if (child.material) {
+                child.material.metalness = 0.1;
+                child.material.roughness = 0.5;
+                // child.material.envMap = environmentMap; // If using environment maps
+              }
+            }
+          });
+
+          // console.log("GLB model loaded successfully", model);
+
+          // You can now access animations if your model has them:
+          if (gltf.animations && gltf.animations.length) {
+            const mixer = new THREE.AnimationMixer(model);
+            const action = mixer.clipAction(gltf.animations[0]);
+            action.play();
+
+            // Add mixer to your update loop
+            // function animate() {
+            //   mixer.update(deltaTime);
+            // }
+          }
+        },
+
+        // onProgress callback
+        (xhr) => {
+          // console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+        },
+
+        // onError callback
+        (error) => {
+          console.error("Error loading GLB model:", error);
+        }
+      );
+      }
+
+      window.addGlb = addGlb;
+
+      function addFbx(fbxname)
+      {
+        fbxLoader.load(
+        // Path to your FBX file
+        fbxname,
+
+        // onLoad callback
+        (fbx) => {
+          // Scale and position the model if needed
+          let scale = 0.01;
+          fbx.scale.set(scale, scale, scale);
+          fbx.position.set(0, -1.3, 0);
+
+          // Add to scene
+          scene.add(fbx);
+
+          // Optional: Traverse and adjust materials
+          fbx.traverse((child) => {
+            if (child.isMesh) {
+              // child.castShadow = true;
+              // child.receiveShadow = true;
+
+              // Adjust material if needed
+              if (child.material) {
+                child.material.metalness = 0;
+                child.material.roughness = 1;
+              }
+            }
+          });
+
+          // console.log("FBX model loaded successfully");
+        },
+
+        // onProgress callback
+        (xhr) => {
+          // console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+        },
+
+        // onError callback
+        (error) => {
+          console.error("Error loading FBX model:", error);
+        }
+      );
+      }
+      window.addFbx = addFbx;
 
       function resizeEvent(event)
       {
